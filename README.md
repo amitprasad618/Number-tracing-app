@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Kids Number Tracing
 
 An offline Flutter Android app that helps toddlers and preschool children (ages 2–5) learn and trace numbers from 1 to 20.
@@ -110,3 +111,6 @@ flutter run
 ## License
 
 Private project — not published to pub.dev.
+=======
+# Number-tracing-app
+>>>>>>> 389c8c8fec2718481030691c0328bbcaf6a217a9

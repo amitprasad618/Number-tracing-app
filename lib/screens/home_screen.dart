@@ -20,9 +20,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LearningProvider>().initialize();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<LearningProvider>();
+      debugPrint('HomeScreen: initializing audio');
+      await provider.initialize();
+      debugPrint('HomeScreen: calling playBackgroundMusic()');
+      await provider.audioService.playBackgroundMusic();
+      debugPrint('HomeScreen: playBackgroundMusic() returned');
     });
+  }
+
+  @override
+  void dispose() {
+    context.read<LearningProvider>().audioService.stopBackgroundMusic();
+    super.dispose();
   }
 
   Future<void> _handleSuccessFinished(LearningProvider provider) async {

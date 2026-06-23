@@ -36,6 +36,10 @@ class AppConstants {
   /// Minimum stroke length ratio required inside the number shape.
   static const double tracingMinimumStrokeLengthRatio = 0.36;
 
+  static const String backgroundMusicPath = 'sounds/background_music.mp3';
+  static const double backgroundMusicVolume = 0.30;
+  static const double successSoundVolume = 1.0;
+
   static const double sectionTopRatio = 0.25;
   static const double sectionMiddleRatio = 0.45;
   static const double sectionBottomRatio = 0.30;
