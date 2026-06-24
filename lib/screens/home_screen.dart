@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kids_tracing_app/constants/app_constants.dart';
 import 'package:kids_tracing_app/providers/learning_provider.dart';
@@ -16,10 +17,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  DateTime? _lastBackPressed;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<LearningProvider>();
       debugPrint('HomeScreen: initializing audio');
@@ -32,8 +36,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     context.read<LearningProvider>().audioService.stopBackgroundMusic();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    debugPrint('HomeScreen: lifecycle -> $state');
+
+    if (!mounted) return;
+
+    final audio = context.read<LearningProvider>().audioService;
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        audio.resumeBackgroundMusic();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        audio.pauseBackgroundMusic();
+        break;
+      case AppLifecycleState.detached:
+        audio.stopBackgroundMusic();
+        break;
+    }
   }
 
   Future<void> _handleSuccessFinished(LearningProvider provider) async {
@@ -57,85 +87,129 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, provider, _) {
         final currentNumber = provider.currentItem.number;
 
-        return Scaffold(
-          backgroundColor: AppConstants.backgroundColor,
-          body: SafeArea(
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    Flexible(
-                      flex: 5,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Trace the Number',
-                              style: GoogleFonts.baloo2(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w800,
-                                color: AppConstants.primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Number $currentNumber of ${AppConstants.maxNumber}',
-                              style: GoogleFonts.baloo2(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: AppConstants.primaryColor.withValues(
-                                  alpha: 0.85,
+        return PopScope<Object?>(
+          canPop: false,
+          onPopInvokedWithResult: (bool didPop, Object? result) async {
+            if (didPop) return;
+            final now = DateTime.now();
+
+            if (_lastBackPressed == null ||
+                now.difference(_lastBackPressed!) >
+                    const Duration(seconds: 2)) {
+              _lastBackPressed = now;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Press back again to exit'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+
+            final choice = await showDialog<String>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Exit App?'),
+                content: const Text(
+                  'Do you want to exit or continue learning?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop('resume'),
+                    child: const Text('Resume'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop('exit'),
+                    child: const Text('Exit'),
+                  ),
+                ],
+              ),
+            );
+
+            if (choice == 'exit') {
+              SystemNavigator.pop();
+            }
+          },
+          child: Scaffold(
+            backgroundColor: AppConstants.backgroundColor,
+            body: SafeArea(
+              child: Stack(
+                children: [
+                  Column(
+                    children: [
+                      Flexible(
+                        flex: 5,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Trace the Number',
+                                style: GoogleFonts.baloo2(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppConstants.primaryColor,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 16),
+                              Text(
+                                'Number $currentNumber of ${AppConstants.maxNumber}',
+                                style: GoogleFonts.baloo2(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppConstants.primaryColor.withValues(
+                                    alpha: 0.85,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    Flexible(
-                      flex: 9,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: TracingCanvas(
-                          key: ValueKey(currentNumber),
-                          digit: currentNumber,
+                      Flexible(
+                        flex: 9,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: TracingCanvas(
+                            key: ValueKey(currentNumber),
+                            digit: currentNumber,
+                          ),
                         ),
                       ),
-                    ),
-                    Flexible(
-                      flex: 6,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            ProgressIndicatorWidget(
-                              progress: provider.tracingProgress,
-                            ),
-                            const SizedBox(height: 18),
-                            _BottomButtonRow(
-                              currentNumber: currentNumber,
-                              canGoPrevious: provider.canGoPrevious,
-                              canGoNext: provider.canGoNext,
-                              isTracingComplete: provider.isTracingComplete,
-                              onClear: provider.clearTracing,
-                              onPrevious: provider.goToPrevious,
-                              onNext: provider.goToNext,
-                            ),
-                          ],
+                      Flexible(
+                        flex: 6,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ProgressIndicatorWidget(
+                                progress: provider.tracingProgress,
+                              ),
+                              const SizedBox(height: 18),
+                              _BottomButtonRow(
+                                currentNumber: currentNumber,
+                                canGoPrevious: provider.canGoPrevious,
+                                canGoNext: provider.canGoNext,
+                                isTracingComplete: provider.isTracingComplete,
+                                onClear: provider.clearTracing,
+                                onPrevious: provider.goToPrevious,
+                                onNext: provider.goToNext,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                if (provider.showSuccessOverlay)
-                  SuccessOverlay(
-                    onFinished: () => _handleSuccessFinished(provider),
+                    ],
                   ),
-              ],
+                  if (provider.showSuccessOverlay)
+                    SuccessOverlay(
+                      onFinished: () => _handleSuccessFinished(provider),
+                    ),
+                ],
+              ),
             ),
           ),
         );
