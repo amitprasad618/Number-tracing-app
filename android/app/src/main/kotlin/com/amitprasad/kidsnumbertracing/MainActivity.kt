@@ -1,4 +1,4 @@
-package com.example.kids_tracing_app
+package com.amitprasad.kidsnumbertracing
 
 import io.flutter.embedding.android.FlutterActivity
 
